@@ -130,7 +130,15 @@ const ProfileScreen = () => {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
             {image ? (
-              <Image source={{ uri: image }} style={styles.avatar} />
+              <Image
+                key={image} // <--- KASIH INI BRE! Biar dipaksa render pas state ganti
+                source={{ uri: image }}
+                style={styles.avatar}
+                onLoad={() => console.log("Berhasil Render!")}
+                onError={(e) =>
+                  console.log("Gagal Render:", e.nativeEvent.error)
+                }
+              />
             ) : (
               <View
                 style={[
@@ -144,9 +152,6 @@ const ProfileScreen = () => {
               <Camera size={16} color="#fff" />
             </View>
           </TouchableOpacity>
-          <Text style={[styles.roleLabel, { color: theme.primary }]}>
-            {user?.role?.toUpperCase()}
-          </Text>
         </View>
 
         {/* SETTINGS CARD */}

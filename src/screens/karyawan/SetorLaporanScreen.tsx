@@ -160,7 +160,7 @@ const SetorLaporanScreen = ({ navigation }: any) => {
               style={{ marginRight: 10, marginTop: 5 }}
             />
             <TextInput
-              style={[styles.input, { color: theme.text, height: 80 }]}
+              style={[styles.input, { color: theme.text }]}
               placeholder="Misal: Rame banget bre, atau ada tips dikit..."
               placeholderTextColor="#999"
               multiline

@@ -19,12 +19,15 @@ import {
 
 import LoginScreen from "../screens/auth/LoginScreen";
 import ProfileScreen from "../screens/auth/ProfileScreen";
+// owner
 import DashboardOwnerScreen from "../screens/owner/DashboardOwnerScreen";
 import MonitorAbsensiScreen from "../screens/owner/MonitorAbsensiScreen";
 import ManageKaryawanScreen from "../screens/owner/ManageKaryawanScreen";
 import ManageBranchScreen from "../screens/owner/ManageBranchScreen";
-import DashboardKaryawanScreen from "../screens/karyawan/Dashboard";
+// karyawan
 import CheckInScreen from "../screens/karyawan/CheckInScreen";
+import DashboardKaryawanScreen from "../screens/karyawan/Dashboard";
+import SetorLaporanScreen from "../screens/karyawan/SetorLaporanScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -177,6 +180,7 @@ export default function AppNavigator() {
               />
             )}
             <Stack.Screen name="CheckIn" component={CheckInScreen} />
+            <Stack.Screen name="SetorLaporan" component={SetorLaporanScreen} />
           </>
         )}
       </Stack.Navigator>

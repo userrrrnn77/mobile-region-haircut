@@ -16,7 +16,7 @@ import { CustomButton } from "../../components/CustomButton";
 import { Colors } from "../../constants/Colors"; // Import gudang cat lu bre
 import { TrendingUp, Users, MapPin } from "lucide-react-native"; // Biar makin elit
 
-const KaryawanDashboard = () => {
+const KaryawanDashboard = ({ navigation }: any) => {
   const scheme = useColorScheme() || "dark";
   // Fix TS Error: Paksa pake type 'light' | 'dark' biar kaga jembot lagi
   const theme = Colors[scheme as "light" | "dark"];
@@ -29,11 +29,17 @@ const KaryawanDashboard = () => {
     gajiEstimasi: 0,
   });
 
+  const date = new Date();
+  const jam = date.getHours();
+  const minute = date.getMinutes();
+  const waktuSekarang = `jam sekarang: ${jam}.${minute} menit`;
+
   const loadData = async () => {
     setLoading(true);
     try {
       const res = await getDashboardData();
       setData(res.data.data);
+      console.log(waktuSekarang, res.data.data); //
     } catch (err: any) {
       console.log(err);
       Alert.alert("Error", "Gagal narik data cuan hari ini bre");
@@ -124,7 +130,9 @@ const KaryawanDashboard = () => {
                 styles.statusIndicator,
                 {
                   backgroundColor:
-                    data.statusAbsen === "masuk" ? theme.success : theme.danger,
+                    data?.statusAbsen === "masuk"
+                      ? theme.success
+                      : theme.danger,
                 },
               ]}
             />
@@ -134,33 +142,36 @@ const KaryawanDashboard = () => {
                 Kondisi Saat Ini
               </Text>
               <Text style={[styles.statusValue, { color: theme.text }]}>
-                {data.statusAbsen === "masuk"
+                {data?.statusAbsen === "masuk"
                   ? "Sedang Bekerja"
                   : "Belum Absen"}
               </Text>
             </View>
           </View>
-          {data.statusAbsen === "masuk" && (
+          {data?.statusAbsen === "masuk" && (
             <Text style={styles.timeText}>08:00 AM</Text>
           )}
         </View>
 
         {/* Tombol Aksi */}
         <View style={styles.actionWrapper}>
-          {data.statusAbsen !== "masuk" ? (
+          {data?.statusAbsen !== "masuk" ? (
             <CustomButton
               title="GAS CHECK-IN SEKARANG"
-              onPress={() =>
-                Alert.alert("GPS Ready", "Masuk radius 7 meter bre?")
-              }
+              onPress={() => navigation.navigate("CheckIn", { mode: "in" })}
             />
           ) : (
             <CustomButton
               title="CHECK-OUT (SELESAI)"
               type="danger"
-              onPress={() => Alert.alert("Yakin?", "Cuan udah cukup nih?")}
+              onPress={() => navigation.navigate("CheckIn", { mode: "out" })}
             />
           )}
+          <CustomButton
+            title="INPUT LAPORAN (SETOR CUAN)"
+            onPress={() => navigation.navigate("SetorLaporan")} // <--- Panggil nama yang di Navigator tadi
+            type="primary"
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

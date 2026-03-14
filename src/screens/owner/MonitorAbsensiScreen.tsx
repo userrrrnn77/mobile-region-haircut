@@ -12,6 +12,8 @@ import {
   RefreshControl,
   TouchableOpacity,
   StatusBar,
+  Modal,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
@@ -22,7 +24,11 @@ import {
   User as UserIcon,
   Calendar,
   Thermometer,
+  X,
+  Info,
 } from "lucide-react-native";
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 const MonitorAbsensiScreen = () => {
   const scheme = useColorScheme() || "dark";
@@ -32,12 +38,17 @@ const MonitorAbsensiScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [dataAbsensi, setDataAbsensi] = useState<any[]>([]);
 
+  // State buat Modal Detail
+  const [selectedAbsen, setSelectedAbsen] = useState<any>(null);
+  const [showModal, setShowModal] = useState(false);
+
   const fetchAbsensi = async () => {
     try {
-      // BE lu nerima params startDate & endDate kalo mau filter,
-      // tapi default-nya narik semua (berdasarkan controller lu)
       const res = await getAllAbsensi();
-      if (res.data) {
+      // Pastiin ambil data dari res.data.data sesuai log lu
+      if (res.data?.success) {
+        setDataAbsensi(res.data.data);
+      } else if (Array.isArray(res.data)) {
         setDataAbsensi(res.data);
       }
     } catch (err) {
@@ -57,6 +68,11 @@ const MonitorAbsensiScreen = () => {
     fetchAbsensi();
   };
 
+  const handleOpenDetail = (item: any) => {
+    setSelectedAbsen(item);
+    setShowModal(true);
+  };
+
   const renderItem = ({ item }: { item: any }) => {
     const isSakit = item.type === "sakit";
     const statusColor = isSakit
@@ -65,8 +81,13 @@ const MonitorAbsensiScreen = () => {
         ? theme.success
         : theme.primary;
 
+    // FIX FOTO: Ambil dari locationSnapShot.photo
+    const photoUrl = item.photo;
+
     return (
-      <View
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => handleOpenDetail(item)}
         style={[
           styles.card,
           { backgroundColor: theme.card, borderColor: theme.border },
@@ -101,13 +122,9 @@ const MonitorAbsensiScreen = () => {
         </View>
 
         <View style={styles.contentRow}>
-          {/* FOTO ABSEN */}
           <View style={[styles.imageContainer, { borderColor: theme.border }]}>
-            {item.attachments?.[0]?.url ? (
-              <Image
-                source={{ uri: item.attachments[0].url }}
-                style={styles.absensiImage}
-              />
+            {photoUrl ? (
+              <Image source={{ uri: photoUrl }} style={styles.absensiImage} />
             ) : (
               <View style={styles.noImage}>
                 <Text style={{ fontSize: 10, color: "#999" }}>No Photo</Text>
@@ -115,7 +132,6 @@ const MonitorAbsensiScreen = () => {
             )}
           </View>
 
-          {/* DETAIL INFO */}
           <View style={styles.details}>
             <View style={styles.infoRow}>
               <Clock size={14} color={theme.tabIconDefault} />
@@ -132,31 +148,22 @@ const MonitorAbsensiScreen = () => {
               <Text
                 style={[styles.infoText, { color: theme.text }]}
                 numberOfLines={1}>
-                {item.locationSnapShot?.name || "Lokasi kaga jelas"}
+                {item.locationSnapShot?.name || "Gedang Anak"}
               </Text>
             </View>
-            {isSakit ? (
-              <View style={styles.infoRow}>
-                <Thermometer size={14} color={theme.danger} />
-                <Text
-                  style={[
-                    styles.infoText,
-                    { color: theme.danger, fontWeight: "bold" },
-                  ]}>
-                  Note: {item.note || "Izin sakit mbot"}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.infoRow}>
-                <TrendingUp size={14} color={theme.primary} />
-                <Text style={[styles.infoText, { color: theme.text }]}>
-                  Radius: {Math.round(item.distanceMetres || 0)}m
-                </Text>
-              </View>
-            )}
+            <View style={styles.infoRow}>
+              <Info size={14} color={theme.primary} />
+              <Text
+                style={[styles.infoText, { color: theme.text }]}
+                numberOfLines={1}>
+                {item.distanceFromCenter
+                  ? `Jarak: ${Math.round(item.distanceFromCenter)}m`
+                  : `Radius: ${item.locationSnapShot?.radiusMeter}m`}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -208,14 +215,135 @@ const MonitorAbsensiScreen = () => {
           }
         />
       )}
+
+      {/* MODAL DETAIL ABSENSI */}
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Detail Bukti Absen
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowModal(false)}
+                style={styles.closeBtn}>
+                <X size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedAbsen && (
+              <View>
+                {/* Foto Gede (FIXED PATH) */}
+                <View
+                  style={[
+                    styles.largeImageContainer,
+                    { borderColor: theme.border },
+                  ]}>
+                  {selectedAbsen.photo ? (
+                    <Image
+                      source={{ uri: selectedAbsen.photo }}
+                      style={styles.largeImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.noImageLarge}>
+                      <Text style={{ color: theme.tabIconDefault }}>
+                        No Photo Evidence
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.modalBody}>
+                  <View style={styles.detailRow}>
+                    <UserIcon size={18} color={theme.primary} />
+                    <View style={{ marginLeft: 10 }}>
+                      <Text
+                        style={{ color: theme.tabIconDefault, fontSize: 12 }}>
+                        Karyawan
+                      </Text>
+                      <Text
+                        style={{
+                          color: theme.text,
+                          fontWeight: "bold",
+                          fontSize: 16,
+                        }}>
+                        {selectedAbsen.user?.fullname || "User"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Clock size={18} color={theme.primary} />
+                    <View style={{ marginLeft: 10 }}>
+                      <Text
+                        style={{ color: theme.tabIconDefault, fontSize: 12 }}>
+                        Waktu & Durasi
+                      </Text>
+                      <Text style={{ color: theme.text, fontWeight: "bold" }}>
+                        {new Date(selectedAbsen.createdAt).toLocaleTimeString()}{" "}
+                        -
+                        <Text
+                          style={{
+                            color:
+                              selectedAbsen.type === "masuk"
+                                ? theme.success
+                                : theme.primary,
+                          }}>
+                          {" "}
+                          {selectedAbsen.type.toUpperCase()}
+                        </Text>
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <MapPin size={18} color={theme.primary} />
+                    <View style={{ marginLeft: 10 }}>
+                      <Text
+                        style={{ color: theme.tabIconDefault, fontSize: 12 }}>
+                        Lokasi & Jarak
+                      </Text>
+                      <Text style={{ color: theme.text, fontWeight: "500" }}>
+                        {selectedAbsen.locationSnapShot?.name}
+                      </Text>
+                      <Text
+                        style={{ color: theme.tabIconDefault, fontSize: 11 }}>
+                        Presisi:{" "}
+                        {Math.round(selectedAbsen.distanceFromCenter || 0)}{" "}
+                        meter dari titik pusat
+                      </Text>
+                    </View>
+                  </View>
+
+                  {selectedAbsen.note && (
+                    <View
+                      style={[
+                        styles.noteBox,
+                        { backgroundColor: theme.border + "40" },
+                      ]}>
+                      <Text
+                        style={{ color: theme.tabIconDefault, fontSize: 11 }}>
+                        Catatan System/User:
+                      </Text>
+                      <Text style={{ color: theme.text, fontStyle: "italic" }}>
+                        "{selectedAbsen.note}"
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
-
-// Helper Icon biar kaga error (kalo lupa import)
-const TrendingUp = ({ size, color }: any) => (
-  <MapPin size={size} color={color} />
-);
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -274,6 +402,41 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
   infoText: { fontSize: 13, marginLeft: 6 },
   emptyState: { alignItems: "center", marginTop: 100 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    width: "100%",
+    borderRadius: 30,
+    padding: 20,
+    maxHeight: "90%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "900" },
+  closeBtn: { padding: 5 },
+  largeImageContainer: {
+    width: "100%",
+    height: screenHeight * 0.4,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+    backgroundColor: "#000",
+    marginBottom: 20,
+  },
+  largeImage: { width: "100%", height: "100%" },
+  noImageLarge: { flex: 1, justifyContent: "center", alignItems: "center" },
+  modalBody: { paddingHorizontal: 5 },
+  detailRow: { flexDirection: "row", alignItems: "center", marginBottom: 15 },
+  noteBox: { marginTop: 10, padding: 15, borderRadius: 15 },
 });
 
 export default MonitorAbsensiScreen;

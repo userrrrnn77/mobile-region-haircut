@@ -17,7 +17,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LineChart } from "react-native-chart-kit";
 import { Colors } from "../../constants/Colors";
-import { getLaporanHarian, getAllBranches } from "../../api/layanan";
+import {
+  getLaporanHarian,
+  getAllBranches,
+  getDashboardData,
+} from "../../api/layanan";
 import {
   Banknote,
   Users,
@@ -62,11 +66,19 @@ const DashboardOwnerScreen = () => {
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      // 1. Ambil List Branch buat Filter
       const resBranch = await getAllBranches();
-      if (resBranch.data) setBranches(resBranch.data);
 
-      // 2. Ambil Laporan
+      // DEBUG: Liat di console lu isinya array apa bukan
+      console.log("DATA BRANCH BRE:", resBranch.data);
+
+      // Kadang API balikin { success: true, data: [...] }
+      // Jadi kita cek mana yang isinya array
+      if (Array.isArray(resBranch.data)) {
+        setBranches(resBranch.data);
+      } else if (resBranch.data && Array.isArray(resBranch.data.data)) {
+        setBranches(resBranch.data.data);
+      }
+
       await fetchData();
     } catch (err) {
       console.error("INIT_ERR:", err);
@@ -77,35 +89,89 @@ const DashboardOwnerScreen = () => {
 
   const fetchData = async (branchId = selectedBranch.id) => {
     try {
-      const res = await getLaporanHarian({
+      // 1. Ambil Summary (Buat kotak-kotak atas)
+      const resDash = await getDashboardData();
+
+      let currentTotalRevenue = 0; // Backup buat jaga-jaga chart zonk
+
+      if (resDash.data.success) {
+        const s = resDash.data.summary;
+        setSummary({
+          totalRevenue: s?.totalRevenue || 0,
+          totalOwner: s?.totalOwner || 0,
+          totalEmployee: s?.totalEmployee || 0,
+          totalManagement: s?.totalManagement || 0,
+        });
+        currentTotalRevenue = s?.totalRevenue || 0;
+      }
+
+      // 2. Setting Range Tanggal (Bulan Berjalan)
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split("T")[0];
+      const today = now.toISOString().split("T")[0];
+
+      // 3. Ambil Data History buat Chart
+      const resHistory = await getLaporanHarian({
         branchId: branchId || undefined,
-        // Ambil 7 hari terakhir
-        startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split("T")[0],
-        endDate: new Date().toISOString().split("T")[0],
+        startDate: firstDay,
+        endDate: today,
       });
 
-      if (res.data.success) {
-        setSummary(res.data.summary);
-        const rawData = [...res.data.data].reverse();
+      // Ambil array datanya (sesuai log lu tadi: resHistory.data.data)
+      const historyArray = resHistory.data?.data || [];
 
-        if (rawData.length > 0) {
-          setChartData({
-            labels: rawData.map((d: any) =>
-              new Date(d.reportDate).toLocaleDateString("id-ID", {
-                day: "2-digit",
-                month: "short",
-              }),
-            ),
-            datasets: [{ data: rawData.map((d: any) => d.totalRevenue) }],
-          });
-        } else {
-          setChartData({ labels: ["No Data"], datasets: [{ data: [0] }] });
-        }
+      if (Array.isArray(historyArray) && historyArray.length > 0) {
+        const monthlyMap: Record<string, number> = {};
+
+        historyArray.forEach((item: any) => {
+          // Fallback tanggal: reportDate atau createdAt
+          const rawDate = item.reportDate || item.createdAt;
+          if (rawDate) {
+            const d = new Date(rawDate);
+            const tgl = d.getDate().toString();
+
+            // Sesuai controller backend lu: totalSetoran (jatah owner)
+            // Omzet total = totalSetoran / 0.5 (alias kali 2)
+            const jatahOwner = item.totalSetoran || item.ownerShare || 0;
+            const omzet = jatahOwner * 2;
+
+            monthlyMap[tgl] = (monthlyMap[tgl] || 0) + omzet;
+          }
+        });
+
+        const sortedLabels = Object.keys(monthlyMap).sort(
+          (a, b) => parseInt(a) - parseInt(b),
+        );
+        const dataValues = sortedLabels.map((label) => monthlyMap[label]);
+
+        setChartData({
+          labels: sortedLabels,
+          datasets: [
+            {
+              data: dataValues,
+              color: (opacity = 1) => theme.primary,
+            },
+          ],
+        });
+      } else {
+        // FALLBACK: Kalo history zonk, tampilin data hari ini aja biar chart gak mati
+        const tglHariIni = now.getDate().toString();
+        setChartData({
+          labels: [tglHariIni],
+          datasets: [
+            {
+              data: [currentTotalRevenue],
+              color: (opacity = 1) => theme.primary,
+            },
+          ],
+        });
       }
     } catch (err) {
-      console.error("FETCH_ERR:", err);
+      console.log("Salah di mari asu:", err);
+      // Biar kaga nge-hang aplikasinya
+      setChartData({ labels: ["!"], datasets: [{ data: [0] }] });
     }
   };
 
@@ -178,34 +244,58 @@ const DashboardOwnerScreen = () => {
         ) : (
           <>
             {/* CHART LINE */}
+            {/* SECTION CHART REVENUE BULANAN */}
             <View
               style={[
                 styles.chartBox,
                 { backgroundColor: theme.card, borderColor: theme.border },
               ]}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Tren Omzet 7 Hari
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.text, marginBottom: 10 },
+                ]}>
+                Statistik Revenue (Bulan Ini)
               </Text>
+
               <LineChart
                 data={chartData}
-                width={screenWidth - 70}
-                height={200}
+                width={screenWidth - 70} // Menyesuaikan lebar layar minus padding
+                height={220} // Space ekstra biar label tanggal di bawah aman
                 chartConfig={{
                   backgroundColor: theme.card,
                   backgroundGradientFrom: theme.card,
                   backgroundGradientTo: theme.card,
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => theme.primary,
-                  labelColor: (opacity = 1) => theme.text,
+                  decimalPlaces: 0, // Gak pake koma-komaan di angka
+                  color: (opacity = 1) => theme.primary, // Warna garis utama
+                  labelColor: (opacity = 1) => theme.text, // Warna teks label (X & Y)
                   propsForDots: {
                     r: "4",
                     strokeWidth: "2",
                     stroke: theme.primary,
                   },
+                  // LOGIC FORMAT ANGKA SUMBU Y (Biar 1.000.000 jadi 1M)
+                  formatYLabel: (value) => {
+                    const numericValue = parseInt(value);
+                    if (numericValue >= 1000000)
+                      return (numericValue / 1000000).toFixed(1) + "M";
+                    if (numericValue >= 1000)
+                      return (numericValue / 1000).toFixed(0) + "rb";
+                    return value;
+                  },
                 }}
-                bezier
-                style={{ marginVertical: 10, borderRadius: 16 }}
+                bezier // Biar garisnya melengkung (smooth), bukan kaku
+                style={{
+                  marginVertical: 10,
+                  borderRadius: 16,
+                  marginLeft: -15, // Supaya angka di sumbu Y nggak kepotong layar kiri
+                }}
               />
+
+              <Text
+                style={{ color: "#888", fontSize: 10, textAlign: "center" }}>
+                *Data di-reset otomatis setiap awal bulan
+              </Text>
             </View>
 
             {/* SUMMARY GRID */}
@@ -262,20 +352,23 @@ const DashboardOwnerScreen = () => {
                 Semua Cabang
               </Text>
             </TouchableOpacity>
-            {branches.map((b) => (
-              <TouchableOpacity
-                key={b._id}
-                style={styles.branchItem}
-                onPress={() => handleSelectBranch(b._id, b.name)}>
-                <Text
-                  style={{
-                    color:
-                      selectedBranch.id === b._id ? theme.primary : theme.text,
-                  }}>
-                  {b.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {Array.isArray(branches) && // oke ini dulu deh, ini kenapa munculnya cuma semua branch bre, gw udah ada 1 branch, gw mau filter pake branch itu mbot
+              branches?.map((b) => (
+                <TouchableOpacity
+                  key={b._id}
+                  style={styles.branchItem}
+                  onPress={() => handleSelectBranch(b._id, b.name)}>
+                  <Text
+                    style={{
+                      color:
+                        selectedBranch.id === b._id
+                          ? theme.primary
+                          : theme.text,
+                    }}>
+                    {b.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
           </View>
         </View>
       </Modal>

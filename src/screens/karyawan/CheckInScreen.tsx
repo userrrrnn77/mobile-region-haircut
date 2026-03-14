@@ -150,7 +150,7 @@ const CheckInScreen = ({ navigation, route }: any) => {
             note: `Check-in radius ${jarak}m`,
           },
           image,
-          "photo",
+          "photo", // ini loh udah photo jembot
         );
         await checkIn(data);
       } else {

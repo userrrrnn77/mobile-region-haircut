@@ -26,10 +26,10 @@ export const useLokasi = () => {
         accuracy: Location.Accuracy.High,
       });
 
-      if (location.mocked) {
-        Alert.alert('Curang!', 'Fake GPS terdeteksi, jangan macem-macem lu bre!');
-        return null;
-      }
+      // if (location.mocked) {
+      //   Alert.alert('Curang!', 'Fake GPS terdeteksi, jangan macem-macem lu bre!');
+      //   return null;
+      // }
 
       const koordinat: Koordinat = {
         lat: location.coords.latitude,
