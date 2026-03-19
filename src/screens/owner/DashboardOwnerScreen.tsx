@@ -63,13 +63,12 @@ const DashboardOwnerScreen = () => {
   }>({ id: "", name: "Semua Cabang" });
   const [showFilter, setShowFilter] = useState(false);
 
+  const [reports, setReports] = useState<any[]>([]);
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
       const resBranch = await getAllBranches();
-
-      // DEBUG: Liat di console lu isinya array apa bukan
-      console.log("DATA BRANCH BRE:", resBranch.data);
 
       // Kadang API balikin { success: true, data: [...] }
       // Jadi kita cek mana yang isinya array
@@ -100,17 +99,21 @@ const DashboardOwnerScreen = () => {
           totalRevenue: s?.totalRevenue || 0,
           totalOwner: s?.totalOwner || 0,
           totalEmployee: s?.totalEmployee || 0,
-          totalManagement: s?.totalManagement || 0,
+          totalManagement: s?.managementNet || 0,
         });
         currentTotalRevenue = s?.totalRevenue || 0;
       }
 
+      const dataDariResDash = resDash.data.summary;
+
       // 2. Setting Range Tanggal (Bulan Berjalan)
       const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .split("T")[0];
-      const today = now.toISOString().split("T")[0];
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+
+      const firstDay = `${year}-${month}-01`; // Tanggal 1 bulan ini
+      const today = `${year}-${month}-${day}`; // Hari ini
 
       // 3. Ambil Data History buat Chart
       const resHistory = await getLaporanHarian({
@@ -118,6 +121,12 @@ const DashboardOwnerScreen = () => {
         startDate: firstDay,
         endDate: today,
       });
+
+      if (resHistory.data?.success) {
+        const dataDariServer = resHistory.data?.data;
+
+        setReports(dataDariServer);
+      }
 
       // Ambil array datanya (sesuai log lu tadi: resHistory.data.data)
       const historyArray = resHistory.data?.data || [];
@@ -320,13 +329,115 @@ const DashboardOwnerScreen = () => {
               />
               <StatCard
                 title="Kas Management"
-                value={formatIDR(summary.totalManagement)}
+                value={formatIDR(summary.totalManagement)} // bre berarti ini udah di potong pengeluaran harusnya
                 icon={<Store color="#fff" />}
                 color="#6f42c1"
               />
             </View>
           </>
         )}
+
+        {/* LIST LAPORAN HARIAN */}
+        <View style={{ marginTop: 25, marginBottom: 30 }}>
+          <View>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.text, marginBottom: 15 },
+              ]}>
+              Aktivitas Setoran Hari Ini
+            </Text>
+            {/* disini kasih buat lihat semua laporan bre daripada harus nambah tab naivasi bre mending kasih sini aja bre */}
+          </View>
+
+          {reports.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={{ color: "#888" }}>
+                Belum ada setoran masuk, bre.
+              </Text>
+            </View>
+          ) : (
+            reports.map((item) => (
+              <View
+                key={item._id}
+                style={[
+                  styles.reportCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                ]}>
+                <View style={styles.reportMain}>
+                  <View>
+                    <Text
+                      style={{
+                        color: theme.text,
+                        fontWeight: "bold",
+                        fontSize: 16,
+                      }}>
+                      Total Setor
+                    </Text>
+                    <Text
+                      style={{
+                        color: theme.primary,
+                        fontSize: 12,
+                        fontWeight: "600",
+                      }}>
+                      {item.createdBy?.fullname || "Karyawan"}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text
+                      style={{
+                        color: theme.success,
+                        fontWeight: "900",
+                        fontSize: 16,
+                      }}>
+                      Net:{" "}
+                      {formatIDR(
+                        item.totalRevenue -
+                          (item.managementExpenses?.reduce(
+                            (a: any, b: any) => a + b.amount,
+                            0,
+                          ) || 0),
+                      )}
+                    </Text>
+                    <Text style={{ color: "#888", fontSize: 11 }}>
+                      +{formatIDR(item.totalRevenue)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* LIST JAJANAN (Kalo Ada) */}
+                {item.managementExpenses?.length > 0 && (
+                  <View style={styles.expenseBox}>
+                    <Text
+                      style={{
+                        color: "#ff4444",
+                        fontSize: 11,
+                        fontWeight: "bold",
+                        marginBottom: 5,
+                      }}>
+                      Rincian Pengeluaran:
+                    </Text>
+                    {item.managementExpenses.map((exp: any, idx: number) => (
+                      <View key={idx} style={styles.expenseRow}>
+                        <Text style={{ color: theme.text, fontSize: 12 }}>
+                          • {exp.description}
+                        </Text>
+                        <Text
+                          style={{
+                            color: "#ff4444",
+                            fontSize: 12,
+                            fontWeight: "700",
+                          }}>
+                          -{formatIDR(exp.amount)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
 
       {/* MODAL FILTER BRANCH */}
@@ -436,6 +547,38 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderBottomWidth: 0.5,
     borderBottomColor: "#ccc",
+  },
+  emptyBox: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#444",
+    borderStyle: "dashed",
+    borderRadius: 15,
+  },
+  reportCard: {
+    padding: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 12,
+    elevation: 2,
+  },
+  reportMain: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  expenseBox: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: "#444",
+  },
+  expenseRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 3,
   },
 });
 

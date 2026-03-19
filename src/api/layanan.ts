@@ -73,6 +73,7 @@ export const deleteBranch = (id: string) => API.delete(`/branch/${id}`);
 export const setorLaporanHarian = (data: {
   totalRevenue: number;
   notes?: string;
+  managementExpenses?: { description: string; amount: number }[];
 }) => API.post("/laporan/setor", data);
 
 export const getLaporanHarian = (params?: {

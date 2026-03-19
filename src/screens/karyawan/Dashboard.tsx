@@ -27,6 +27,8 @@ const KaryawanDashboard = ({ navigation }: any) => {
     statusAbsen: "...",
     totalKepala: 0,
     gajiEstimasi: 0,
+    totalGajiBulanIni: 0, // <--- Tambahin ini bre
+    today: "",
   });
 
   const date = new Date();
@@ -34,18 +36,69 @@ const KaryawanDashboard = ({ navigation }: any) => {
   const minute = date.getMinutes();
   const waktuSekarang = `jam sekarang: ${jam}.${minute} menit`;
 
+  const [timeLeft, setTimeLeft] = useState<number>(0); // Dalam detik
+
   const loadData = async () => {
     setLoading(true);
     try {
       const res = await getDashboardData();
-      setData(res.data.data);
-      console.log(waktuSekarang, res.data.data); //
+      // Karena di BE lu bungkus pake { success: true, data: { ... } }
+      if (res.data?.success) {
+        const dashboard = res.data.data;
+
+        setData(dashboard);
+
+        console.log("LOG: Status Absen =", dashboard.statusAbsen);
+        console.log("LOG: Checkin Time =", dashboard.checkinTime);
+
+        if (dashboard.statusAbsen === "masuk" && dashboard.checkinTime) {
+          const tigaJam = 3 * 60 * 60 * 1000; // 3 Jam
+          const waktuCheckin = new Date(dashboard.checkinTime).getTime();
+          const waktuSekarang = new Date().getTime();
+          const targetWaktu = waktuCheckin + tigaJam;
+          const selisih = targetWaktu - waktuSekarang;
+
+          console.log("--- DEBUG ABSENSI ---");
+          console.log("Waktu Checkin (Server):", dashboard.checkinTime);
+          console.log(
+            "Waktu Sekarang (HP):",
+            new Date(waktuSekarang).toISOString(),
+          );
+          console.log("Target Checkout:", new Date(targetWaktu).toISOString());
+          console.log("Selisih Detik:", Math.floor(selisih / 1000));
+
+          if (selisih > 0) {
+            setTimeLeft(Math.floor(selisih / 1000));
+          } else {
+            console.log("Status: Sudah lewat 3 jam, bebas checkout!");
+            setTimeLeft(0);
+          }
+        }
+      }
     } catch (err: any) {
-      console.log(err);
-      Alert.alert("Error", "Gagal narik data cuan hari ini bre");
+      console.log("Error Dashboard:", err);
+      Alert.alert("Waduh", "Gagal narik jatah cuan lu hari ini bre");
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  // Fungsi helper buat nampilin format jam:menit:detik
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h}j ${m}m ${s}d`;
   };
 
   useEffect(() => {
@@ -96,26 +149,39 @@ const KaryawanDashboard = ({ navigation }: any) => {
 
         {/* Card Cuan Hari Ini (Highlight Utama) */}
         <View style={[styles.card, { backgroundColor: theme.primary }]}>
+          {/* BAGIAN HARIAN */}
           <View style={styles.rowBetween}>
-            <Text style={styles.cardTitle}>Estimasi Jatah Lu (40%)</Text>
-            <TrendingUp size={20} color="#ffffff88" />
+            <View>
+              <Text style={styles.cardLabel}>Jatah Lu Hari Ini (40%)</Text>
+              <Text style={styles.amount}>
+                Rp {data.gajiEstimasi.toLocaleString("id-ID")}
+              </Text>
+            </View>
+            <View>
+              <TrendingUp size={24} color="#fff" />
+            </View>
           </View>
-          <Text style={styles.amount}>
-            Rp {data.gajiEstimasi.toLocaleString("id-ID")}
-          </Text>
 
           <View style={styles.divider} />
 
+          {/* BAGIAN BULANAN */}
           <View style={styles.rowBetween}>
-            <View style={styles.statItem}>
-              <Users size={16} color="#ffffffaa" />
-              <Text style={styles.subText}>{data.totalKepala} Kepala</Text>
+            <View>
+              <Text style={styles.cardLabel}>
+                Total Bulan Ini (
+                {new Date().toLocaleString("id-ID", { month: "long" })})
+              </Text>
+              <Text style={styles.amountSmall}>
+                Rp {data.totalGajiBulanIni.toLocaleString("id-ID")}
+              </Text>
             </View>
-            <Text style={styles.todayTag}>HARI INI</Text>
           </View>
         </View>
 
         {/* Status Absensi Section */}
+        <Text style={[styles.sectionTitleInfo, { color: theme.danger }]}>
+          *Sebelum Absen Pulang Jangan Lupa Input Laporan Dulu bre!!
+        </Text>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Status Kehadiran
         </Text>
@@ -161,15 +227,44 @@ const KaryawanDashboard = ({ navigation }: any) => {
               onPress={() => navigation.navigate("CheckIn", { mode: "in" })}
             />
           ) : (
-            <CustomButton
-              title="CHECK-OUT (SELESAI)"
-              type="danger"
-              onPress={() => navigation.navigate("CheckIn", { mode: "out" })}
-            />
+            // JIKA STATUS MASUK
+            <View>
+              {timeLeft > 0 ? (
+                // JIKA BELUM 3 JAM
+                <View style={{ marginBottom: 10 }}>
+                  <CustomButton
+                    title={`BELUM BISA PULANG (${formatTime(timeLeft)})`}
+                    type="disabled" // Pastiin CustomButton lu punya styling buat disabled
+                    onPress={() =>
+                      Alert.alert(
+                        "Sabar Bre!",
+                        "Kerja dulu yang bener, minimal 3 jam baru boleh checkout!",
+                      )
+                    }
+                  />
+                </View>
+              ) : (
+                // JIKA SUDAH LEWAT 3 JAM
+                <CustomButton
+                  title="CHECK-OUT (SELESAI)"
+                  type="danger"
+                  onPress={() =>
+                    navigation.navigate("CheckIn", { mode: "out" })
+                  }
+                />
+              )}
+            </View>
           )}
+
           <CustomButton
             title="INPUT LAPORAN (SETOR CUAN)"
-            onPress={() => navigation.navigate("SetorLaporan")} // <--- Panggil nama yang di Navigator tadi
+            onPress={() => {
+              if (data?.statusAbsen !== "masuk") {
+                Alert.alert("Absen Dulu", "Absen Dulu bre anjg!!!");
+              } else {
+                navigation.navigate("SetorLaporan");
+              }
+            }}
             type="primary"
           />
         </View>
@@ -244,6 +339,44 @@ const styles = StyleSheet.create({
   statusValue: { fontSize: 16, fontWeight: "700", marginTop: 2 },
   timeText: { fontSize: 12, fontWeight: "600", opacity: 0.5 },
   actionWrapper: { paddingHorizontal: 20, marginTop: 10 },
+  cardLabel: {
+    color: "#ffffffCC",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+
+  amountSmall: {
+    color: "#00ff99",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  statsInfo: {
+    alignItems: "center",
+    backgroundColor: "#ffffff22",
+    padding: 8,
+    borderRadius: 12,
+    minWidth: 60,
+  },
+  headsCount: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  headsLabel: {
+    color: "#fff",
+    fontSize: 10,
+  },
+  statsIcon: {
+    color: "white",
+  },
+  sectionTitleInfo: {
+    marginHorizontal: 25,
+    fontSize: 12,
+    fontWeight: "400",
+    marginTop: 10,
+  },
 });
 
 export default KaryawanDashboard;

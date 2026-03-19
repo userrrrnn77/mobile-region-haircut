@@ -154,31 +154,6 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* SETTINGS CARD */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}>
-          <View style={styles.row}>
-            <View style={styles.iconCircle}>
-              {isDark ? (
-                <Moon size={18} color={theme.primary} />
-              ) : (
-                <Sun size={18} color={theme.primary} />
-              )}
-            </View>
-            <Text style={[styles.cardText, { color: theme.text }]}>
-              Dark Mode
-            </Text>
-          </View>
-          <Switch
-            value={isDark}
-            onValueChange={toggleTheme}
-            trackColor={{ false: "#767577", true: theme.primary }}
-          />
-        </View>
-
         {/* FORM INPUTS */}
         <View style={styles.form}>
           <Text style={[styles.label, { color: theme.tabIconDefault }]}>

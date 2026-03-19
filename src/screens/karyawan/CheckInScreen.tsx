@@ -120,7 +120,15 @@ const CheckInScreen = ({ navigation, route }: any) => {
         },
         image,
         "photo",
-      ); // BE lu minta 'photo'
+      );
+
+      // --- DEBUG FORM DATA SAKIT ---
+      console.log("--- ISI PAKET SAKIT ---");
+      // @ts-ignore
+      data._parts.forEach((part) => {
+        console.log(`${part[0]}:`, part[1]);
+      });
+      // -----------------------------
 
       await izinSakit(data);
       Alert.alert(
@@ -150,8 +158,17 @@ const CheckInScreen = ({ navigation, route }: any) => {
             note: `Check-in radius ${jarak}m`,
           },
           image,
-          "photo", // ini loh udah photo jembot
+          "photo",
         );
+
+        // --- DEBUG FORM DATA (SIR ALEX MODE) ---
+        console.log("--- ISI PAKET CHECK-IN ---");
+        // @ts-ignore
+        data._parts.forEach((part) => {
+          console.log(`${part[0]}:`, part[1]);
+        });
+        // ---------------------------------------
+
         await checkIn(data);
       } else {
         await checkOut({

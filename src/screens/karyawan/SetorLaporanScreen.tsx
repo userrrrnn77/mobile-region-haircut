@@ -10,12 +10,13 @@ import {
   Alert,
   useColorScheme,
   StatusBar,
+  TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
 import { CustomButton } from "../../components/CustomButton";
 import { setorLaporanHarian } from "../../api/layanan";
-import { Banknote, FileText, Info } from "lucide-react-native";
+import { Banknote, FileText, Info, Trash2 } from "lucide-react-native";
 
 const SetorLaporanScreen = ({ navigation }: any) => {
   const scheme = useColorScheme() || "dark";
@@ -25,6 +26,12 @@ const SetorLaporanScreen = ({ navigation }: any) => {
   const [revenue, setRevenue] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  const [expenses, setExpenses] = useState<
+    { description: string; amount: number }[]
+  >([]);
+  const [expName, setExpName] = useState("");
+  const [expAmount, setExpAmount] = useState("");
 
   // Helper: Format Rupiah buat tampilan
   const formatRupiah = (val: string) => {
@@ -45,35 +52,70 @@ const SetorLaporanScreen = ({ navigation }: any) => {
     const cleanRevenue = Number(revenue.replace(/[^0-9]/g, ""));
 
     if (!cleanRevenue || cleanRevenue <= 0) {
-      return Alert.alert(
-        "Woy!",
-        "Input omzet yang bener, jangan 0 atau kosong asu!",
-      );
+      return Alert.alert("Woy!", "Input omzet yang bener!");
     }
+
+    // --- LOG DEBUGGING SEBELUM KIRIM ---
+    console.log("🚀 MENGIRIM LAPORAN...");
+    console.log("💰 Total Omzet:", cleanRevenue);
+    console.log("📝 Catatan:", notes.trim() || "-");
+    console.log("🛒 Pengeluaran:", JSON.stringify(expenses, null, 2));
+    console.log("----------------------------");
 
     setLoading(true);
     try {
-      // Tembak API (Sesuai layanan.ts: totalRevenue & notes)
       const res = await setorLaporanHarian({
         totalRevenue: cleanRevenue,
         notes: notes.trim() || "-",
+        managementExpenses: expenses,
       });
 
+      // --- LOG DEBUGGING RESPON BE ---
+      console.log("✅ RESPON SERVER:", JSON.stringify(res.data, null, 2));
+
       if (res.data.success) {
-        Alert.alert(
-          "MANTAP BRE!",
-          `Setoran Rp ${cleanRevenue.toLocaleString()} sukses!\nJatah lu hari ini: Rp ${estimasiGaji.toLocaleString()}`,
-          [{ text: "OK", onPress: () => navigation.goBack() }],
-        );
+        Alert.alert("MANTAP BRE!", "Setoran & Laporan Pengeluaran sukses!", [
+          { text: "OK", onPress: () => navigation.goBack() },
+        ]);
       }
     } catch (err: any) {
+      // --- LOG DEBUGGING ERROR ---
+      console.error("❌ ERROR SETOR:");
+      if (err.response) {
+        console.error("Data:", err.response.data);
+        console.error("Status:", err.response.status);
+      } else {
+        console.error("Msg:", err.message);
+      }
+
       Alert.alert(
         "GAGAL",
-        err.response?.data?.message || "Internal Server Error bgsd",
+        err.response?.data?.message || "Error bre! Cek koneksi atau log.",
       );
     } finally {
       setLoading(false);
     }
+  };
+
+  const addExpense = () => {
+    if (!expName || !expAmount)
+      return Alert.alert("Eits!", "Isi nama barang & harganya bre!");
+
+    setExpenses([
+      ...expenses,
+      {
+        description: expName,
+        amount: Number(expAmount.replace(/[^0-9]/g, "")),
+      },
+    ]);
+
+    // Reset input jajan
+    setExpName("");
+    setExpAmount("");
+  };
+
+  const removeExpense = (index: number) => {
+    setExpenses(expenses.filter((_, i) => i !== index));
   };
 
   return (
@@ -116,6 +158,75 @@ const SetorLaporanScreen = ({ navigation }: any) => {
           <Text style={[styles.previewRupiah, { color: theme.primary }]}>
             {formatRupiah(revenue)}
           </Text>
+        </View>
+
+        {/* SECTION PENGELUARAN (OPSIONAL) */}
+        <View style={styles.inputGroup}>
+          <Text style={[styles.label, { color: theme.text }]}>
+            Pengeluaran Cabang (Opsional)
+          </Text>
+
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 10,
+              marginBottom: 10,
+              alignItems: "center",
+            }}>
+            <TextInput
+              style={[
+                styles.inputSmall,
+                {
+                  backgroundColor: theme.card,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              placeholder="Nama Barang (Silet)"
+              placeholderTextColor="#999"
+              value={expName}
+              onChangeText={setExpName}
+            />
+            <TextInput
+              style={[
+                styles.inputSmall,
+                {
+                  backgroundColor: theme.card,
+                  color: theme.text,
+                  borderColor: theme.border,
+                  flex: 0.6,
+                },
+              ]}
+              placeholder="Harga"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+              value={expAmount}
+              onChangeText={setExpAmount}
+            />
+            <CustomButton title="+" onPress={addExpense} />
+          </View>
+
+          {/* LIST JAJANAN YANG UDAH DIINPUT */}
+          {expenses.map((item, index) => (
+            <View
+              key={index}
+              style={[styles.expenseItem, { backgroundColor: theme.card }]}>
+              <Text style={{ color: theme.text, flex: 1 }}>
+                {item.description}
+              </Text>
+              <Text
+                style={{
+                  color: theme.primary,
+                  fontWeight: "bold",
+                  marginRight: 10,
+                }}>
+                - Rp {item.amount.toLocaleString()}
+              </Text>
+              <TouchableOpacity onPress={() => removeExpense(index)}>
+                <Trash2 size={18} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
 
         {/* Info Card: Estimasi Gaji */}
@@ -227,6 +338,23 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
+  },
+  inputSmall: {
+    flex: 1,
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    fontSize: 14,
+  },
+  expenseItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#333",
   },
 });
 

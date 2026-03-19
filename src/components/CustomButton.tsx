@@ -13,7 +13,8 @@ interface Props {
   title: string;
   onPress: () => void;
   loading?: boolean;
-  type?: "primary" | "danger";
+  type?: "primary" | "danger" | "disabled";
+  disabled?: boolean;
 }
 
 export const CustomButton = ({
@@ -21,6 +22,7 @@ export const CustomButton = ({
   onPress,
   loading,
   type = "primary",
+  disabled,
 }: Props) => {
   return (
     <TouchableOpacity
@@ -29,7 +31,7 @@ export const CustomButton = ({
         { backgroundColor: type === "danger" ? "#FF3B30" : "#003a61" },
       ]}
       onPress={onPress}
-      disabled={loading}>
+      disabled={loading || disabled || type === "disabled"}>
       {loading ? (
         <ActivityIndicator color="#fff" />
       ) : (
@@ -45,6 +47,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginVertical: 10,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  text: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  text: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+    textTransform: "uppercase",
+  },
 });

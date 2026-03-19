@@ -15,6 +15,8 @@ import {
   MapPin,
   ClipboardList,
   UserCircle,
+  FileText,
+  Folder,
 } from "lucide-react-native";
 
 import LoginScreen from "../screens/auth/LoginScreen";
@@ -28,6 +30,7 @@ import ManageBranchScreen from "../screens/owner/ManageBranchScreen";
 import CheckInScreen from "../screens/karyawan/CheckInScreen";
 import DashboardKaryawanScreen from "../screens/karyawan/Dashboard";
 import SetorLaporanScreen from "../screens/karyawan/SetorLaporanScreen";
+import ListLaporanScreen from "../screens/owner/ListLaporanScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -68,12 +71,20 @@ function OwnerTabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Laporan"
+        component={ListLaporanScreen} // File baru yang bakal kita bikin
+        options={{
+          tabBarIcon: ({ color }) => <Folder color={color} size={24} />,
+          tabBarLabel: "Arsip",
+        }}
+      />
+      <Tab.Screen
         name="Staff"
         component={ManageKaryawanScreen}
         options={{
           tabBarIcon: ({ color }) => <Users color={color} size={24} />,
           tabBarLabel: "Staff",
-        }}
+        }} // ini gini aman ya bre buat yang dashboard owner
       />
       <Tab.Screen
         name="Branch"
