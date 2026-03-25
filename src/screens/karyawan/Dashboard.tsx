@@ -48,24 +48,12 @@ const KaryawanDashboard = ({ navigation }: any) => {
 
         setData(dashboard);
 
-        console.log("LOG: Status Absen =", dashboard.statusAbsen);
-        console.log("LOG: Checkin Time =", dashboard.checkinTime);
-
         if (dashboard.statusAbsen === "masuk" && dashboard.checkinTime) {
           const tigaJam = 3 * 60 * 60 * 1000; // 3 Jam
           const waktuCheckin = new Date(dashboard.checkinTime).getTime();
           const waktuSekarang = new Date().getTime();
           const targetWaktu = waktuCheckin + tigaJam;
           const selisih = targetWaktu - waktuSekarang;
-
-          console.log("--- DEBUG ABSENSI ---");
-          console.log("Waktu Checkin (Server):", dashboard.checkinTime);
-          console.log(
-            "Waktu Sekarang (HP):",
-            new Date(waktuSekarang).toISOString(),
-          );
-          console.log("Target Checkout:", new Date(targetWaktu).toISOString());
-          console.log("Selisih Detik:", Math.floor(selisih / 1000));
 
           if (selisih > 0) {
             setTimeLeft(Math.floor(selisih / 1000));
