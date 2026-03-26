@@ -3,16 +3,16 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "HaircutRegionApp",
+  name: "Haircut Region",
   slug: "haircut-region-app",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/icon.png",
+  icon: "./assets/icon-region.png",
   userInterfaceStyle: "dark",
   splash: {
-    image: "./assets/splash-icon.png",
+    image: "./assets/splash-region.png",
     resizeMode: "contain",
-    backgroundColor: "#003a61",
+    backgroundColor: "#000",
   },
   ios: {
     supportsTablet: true,
@@ -20,15 +20,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#003a61",
+      foregroundImage: "./assets/adaptive-icon-region.png",
+      backgroundColor: "#000",
     },
     package: "com.haircutregion",
   },
   extra: {
-    baseUrl: process.env.EXPOBASEURL || "http://192.168.1.6:5000/api",
+    baseUrl: process.env.EXPOBASEURL || "https://regionhaircut.vercel.app/api",
     eas: {
-      projectId: "isi-nanti-kalo-udah-pake-eas",
+      projectId: "4d5b0956-8afd-4b54-a823-2defd8a71379",
     },
   },
 });
