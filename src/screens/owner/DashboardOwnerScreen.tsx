@@ -88,34 +88,16 @@ const DashboardOwnerScreen = () => {
 
   const fetchData = async (branchId = selectedBranch.id) => {
     try {
-      // 1. Ambil Summary (Buat kotak-kotak atas)
-      const resDash = await getDashboardData();
-
-      let currentTotalRevenue = 0; // Backup buat jaga-jaga chart zonk
-
-      if (resDash.data.success) {
-        const s = resDash.data.summary;
-        setSummary({
-          totalRevenue: s?.totalRevenue || 0,
-          totalOwner: s?.totalOwner || 0,
-          totalEmployee: s?.totalEmployee || 0,
-          totalManagement: s?.managementNet || 0,
-        });
-        currentTotalRevenue = s?.totalRevenue || 0;
-      }
-
-      const dataDariResDash = resDash.data.summary;
-
-      // 2. Setting Range Tanggal (Bulan Berjalan)
+      // 1. Setting Range Tanggal (Bulan Berjalan)
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const day = String(now.getDate()).padStart(2, "0");
 
-      const firstDay = `${year}-${month}-01`; // Tanggal 1 bulan ini
-      const today = `${year}-${month}-${day}`; // Hari ini
+      const firstDay = `${year}-${month}-01`;
+      const today = `${year}-${month}-${day}`;
 
-      // 3. Ambil Data History buat Chart
+      // 2. Ambil Data History (Ini sumber kebenaran kita, Bre!)
       const resHistory = await getLaporanHarian({
         branchId: branchId || undefined,
         startDate: firstDay,
@@ -123,30 +105,54 @@ const DashboardOwnerScreen = () => {
       });
 
       if (resHistory.data?.success) {
-        const dataDariServer = resHistory.data?.data;
+        const historyArray = resHistory.data?.data || [];
+        setReports(historyArray);
 
-        setReports(dataDariServer);
-      }
-
-      // Ambil array datanya (sesuai log lu tadi: resHistory.data.data)
-      const historyArray = resHistory.data?.data || [];
-
-      if (Array.isArray(historyArray) && historyArray.length > 0) {
-        const monthlyMap: Record<string, number> = {};
+        // --- LOGIC SUMMARY KUMULATIF (DIJUMLAH SEMUA HARI) ---
+        let akumulasiOmzet = 0;
+        let akumulasiOwner = 0;
+        let akumulasiEmployee = 0;
+        let akumulasiManagement = 0;
 
         historyArray.forEach((item: any) => {
-          // Fallback tanggal: reportDate atau createdAt
+          // Omzet (Jatah Owner * 2 sesuai rumus lu)
+          const jatahOwner = item.totalSetoran || item.ownerShare || 0;
+          const omzet = jatahOwner * 2;
+
+          // Gaji Karyawan (Asumsi 40% dari Omzet, atau 80% dari Jatah Owner)
+          // Sesuaikan sama logic pembagian lu, Bre
+          const gajiKaryawan = omzet * 0.4;
+
+          // Kas Management (Total Revenue - Jatah Owner - Gaji)
+          // Atau ambil dari managementExpenses yang udah ada
+          const biayaManagement =
+            item.managementExpenses?.reduce(
+              (a: any, b: any) => a + b.amount,
+              0,
+            ) || 0;
+
+          akumulasiOmzet += omzet;
+          akumulasiOwner += jatahOwner;
+          akumulasiEmployee += gajiKaryawan;
+          akumulasiManagement += omzet * 0.1 - biayaManagement; // Contoh logic kas 10%
+        });
+
+        // Update kotak-kotak di atas pake hasil penjumlahan
+        setSummary({
+          totalRevenue: akumulasiOmzet,
+          totalOwner: akumulasiOwner,
+          totalEmployee: akumulasiEmployee,
+          totalManagement: akumulasiManagement,
+        });
+
+        // --- LOGIC CHART (BIAR TETEP NAIK TURUN) ---
+        const monthlyMap: Record<string, number> = {};
+        historyArray.forEach((item: any) => {
           const rawDate = item.reportDate || item.createdAt;
           if (rawDate) {
-            const d = new Date(rawDate);
-            const tgl = d.getDate().toString();
-
-            // Sesuai controller backend lu: totalSetoran (jatah owner)
-            // Omzet total = totalSetoran / 0.5 (alias kali 2)
+            const tgl = new Date(rawDate).getDate().toString();
             const jatahOwner = item.totalSetoran || item.ownerShare || 0;
-            const omzet = jatahOwner * 2;
-
-            monthlyMap[tgl] = (monthlyMap[tgl] || 0) + omzet;
+            monthlyMap[tgl] = (monthlyMap[tgl] || 0) + jatahOwner * 2;
           }
         });
 
@@ -156,31 +162,12 @@ const DashboardOwnerScreen = () => {
         const dataValues = sortedLabels.map((label) => monthlyMap[label]);
 
         setChartData({
-          labels: sortedLabels,
-          datasets: [
-            {
-              data: dataValues,
-              color: (opacity = 1) => theme.primary,
-            },
-          ],
-        });
-      } else {
-        // FALLBACK: Kalo history zonk, tampilin data hari ini aja biar chart gak mati
-        const tglHariIni = now.getDate().toString();
-        setChartData({
-          labels: [tglHariIni],
-          datasets: [
-            {
-              data: [currentTotalRevenue],
-              color: (opacity = 1) => theme.primary,
-            },
-          ],
+          labels: sortedLabels.length > 0 ? sortedLabels : ["-"],
+          datasets: [{ data: dataValues.length > 0 ? dataValues : [0] }],
         });
       }
     } catch (err) {
       console.log("Salah di mari asu:", err);
-      // Biar kaga nge-hang aplikasinya
-      setChartData({ labels: ["!"], datasets: [{ data: [0] }] });
     }
   };
 
