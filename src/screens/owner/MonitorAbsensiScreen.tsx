@@ -84,6 +84,8 @@ const MonitorAbsensiScreen = () => {
     // FIX FOTO: Ambil dari locationSnapShot.photo
     const photoUrl = item.photo;
 
+    // console.log(dataAbsensi); // undefined
+
     return (
       <TouchableOpacity
         activeOpacity={0.7}
@@ -259,6 +261,25 @@ const MonitorAbsensiScreen = () => {
                 </View>
 
                 <View style={styles.modalBody}>
+
+                  <View style={styles.detailRow}>
+                    <Calendar size={18} color={theme.primary} />
+                    <View style={{ marginLeft: 10 }}>
+                      <Text
+                        style={{ color: theme.tabIconDefault, fontSize: 12 }}>
+                        Tanggal
+                      </Text>
+                      <Text
+                        style={{
+                          color: theme.text,
+                          fontWeight: "bold",
+                          fontSize: 16,
+                        }}>
+                        {selectedAbsen.absensiDayKey || "Tanggal"}
+                      </Text>
+                    </View>
+                  </View>
+
                   <View style={styles.detailRow}>
                     <UserIcon size={18} color={theme.primary} />
                     <View style={{ marginLeft: 10 }}>

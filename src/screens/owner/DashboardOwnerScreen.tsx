@@ -46,6 +46,10 @@ const DashboardOwnerScreen = () => {
     totalOwner: 0,
     totalEmployee: 0,
     totalManagement: 0,
+    totalExpenses: 0, // <--- Tambahin ini
+    totalLateDeduction: 0, // <--- Tambahin ini buat denda
+    managementNet: 0, // <--- Sisa dompet management
+    totalCashToDeposit: 0,
   });
   const [chartData, setChartData] = useState<{
     labels: string[];
@@ -113,28 +117,34 @@ const DashboardOwnerScreen = () => {
         let akumulasiOwner = 0;
         let akumulasiEmployee = 0;
         let akumulasiManagement = 0;
+        let akumulasiDenda = 0; // Tambahin ini bre buat denda
+        let akumulasiExpenses = 0; // <--- Tambahin ini
+        let akumulasiCashToDeposit = 0; // <--- Tambahin ini
 
         historyArray.forEach((item: any) => {
-          // Omzet (Jatah Owner * 2 sesuai rumus lu)
-          const jatahOwner = item.totalSetoran || item.ownerShare || 0;
-          const omzet = jatahOwner * 2;
+          // 1. Ambil data share murni dari DB (karena di DB udah kita "operasi" tadi)
+          const omzet = item.totalRevenue || 0;
+          const jatahOwner = item.ownerShare || 0;
+          const gajiKaryawan = item.employeeShare || 0;
+          const jatahManagement = item.managementShare || 0;
 
-          // Gaji Karyawan (Asumsi 40% dari Omzet, atau 80% dari Jatah Owner)
-          // Sesuaikan sama logic pembagian lu, Bre
-          const gajiKaryawan = omzet * 0.4;
-
-          // Kas Management (Total Revenue - Jatah Owner - Gaji)
-          // Atau ambil dari managementExpenses yang udah ada
+          // 2. Itung pengeluaran jajan hari itu
           const biayaManagement =
             item.managementExpenses?.reduce(
               (a: any, b: any) => a + b.amount,
               0,
             ) || 0;
 
+          // 3. Scan denda dari notes (Opsional, buat info doang)
+          if (item.notes && item.notes.includes("Potongan Telat 5rb")) {
+            akumulasiDenda += 5000;
+          }
+
           akumulasiOmzet += omzet;
           akumulasiOwner += jatahOwner;
           akumulasiEmployee += gajiKaryawan;
-          akumulasiManagement += omzet * 0.1 - biayaManagement; // Contoh logic kas 10%
+          // Management Net = Jatah awal - pengeluaran jajan
+          akumulasiManagement += jatahManagement - biayaManagement;
         });
 
         // Update kotak-kotak di atas pake hasil penjumlahan
@@ -142,7 +152,11 @@ const DashboardOwnerScreen = () => {
           totalRevenue: akumulasiOmzet,
           totalOwner: akumulasiOwner,
           totalEmployee: akumulasiEmployee,
-          totalManagement: akumulasiManagement,
+          totalManagement: akumulasiManagement, // Ini jatah kotor (sebelum potong jajan)
+          totalExpenses: akumulasiExpenses, // <--- ADA
+          totalLateDeduction: akumulasiDenda, // <--- ADA
+          managementNet: akumulasiManagement - akumulasiExpenses, // <--- ADA
+          totalCashToDeposit: akumulasiCashToDeposit, // <--- ADA
         });
 
         // --- LOGIC CHART (BIAR TETEP NAIK TURUN) ---
@@ -152,7 +166,7 @@ const DashboardOwnerScreen = () => {
           if (rawDate) {
             const tgl = new Date(rawDate).getDate().toString();
             const jatahOwner = item.totalSetoran || item.ownerShare || 0;
-            monthlyMap[tgl] = (monthlyMap[tgl] || 0) + jatahOwner * 2;
+            monthlyMap[tgl] = (monthlyMap[tgl] || 0) + (item.totalRevenue || 0);
           }
         });
 
@@ -351,6 +365,18 @@ const DashboardOwnerScreen = () => {
                   styles.reportCard,
                   { backgroundColor: theme.card, borderColor: theme.border },
                 ]}>
+                <View>
+                  <Text
+                    style={{
+                      color: theme.text,
+                      fontWeight: "bold",
+                      fontSize: 16,
+                    }}>
+                    {item.reportDate
+                      ? item.reportDate.split("T")[0]
+                      : item.createdAt.split("T")[0]}
+                  </Text>
+                </View>
                 <View style={styles.reportMain}>
                   <View>
                     <Text
