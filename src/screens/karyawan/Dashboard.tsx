@@ -49,10 +49,10 @@ const KaryawanDashboard = ({ navigation }: any) => {
         setData(dashboard);
 
         if (dashboard.statusAbsen === "masuk" && dashboard.checkinTime) {
-          const tigaJam = 3 * 60 * 60 * 1000; // 3 Jam
+          const tujuJamSetengah = 7.5 * 60 * 60 * 1000; // 7 Jam
           const waktuCheckin = new Date(dashboard.checkinTime).getTime();
           const waktuSekarang = new Date().getTime();
-          const targetWaktu = waktuCheckin + tigaJam;
+          const targetWaktu = waktuCheckin + tujuJamSetengah;
           const selisih = targetWaktu - waktuSekarang;
 
           if (selisih > 0) {
@@ -72,7 +72,7 @@ const KaryawanDashboard = ({ navigation }: any) => {
   };
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
@@ -247,10 +247,29 @@ const KaryawanDashboard = ({ navigation }: any) => {
           <CustomButton
             title="INPUT LAPORAN (SETOR CUAN)"
             onPress={() => {
-              if (data?.statusAbsen !== "masuk") {
-                Alert.alert("Absen Dulu", "Absen Dulu bre anjg!!!");
-              } else {
+              const status = data?.statusAbsen; // Misal isinya: null, "masuk", atau "keluar"
+
+              if (!status) {
+                // Kasus 1: Belum ada record absen hari ini
+                Alert.alert(
+                  "Masuk Dulu Mbot",
+                  "Absen masuk dulu bre, jangan mau cuannya doang! 💀",
+                );
+              } else if (status === "masuk") {
+                // Kasus 2: Baru absen masuk, belum absen keluar
+                // Sesuai request lu: suruh keluar dulu
+                Alert.alert(
+                  "Absen Keluar Dulu Mbot",
+                  "Keluar dulu bre anjing, baru setor! 😤, yang bener kalo setoran mbot jangan ngadi ngadi elu",
+                );
+              } else if (status === "keluar") {
+                // Kasus 3: Sudah absen keluar, jalur ijo
                 navigation.navigate("SetorLaporan");
+              } else if (status === "sakit") {
+                Alert.alert(
+                  "Lagi Sakit",
+                  "Lagi sakit sok-sokan mau setor, istirahat mbot! 🤒",
+                );
               }
             }}
             type="primary"

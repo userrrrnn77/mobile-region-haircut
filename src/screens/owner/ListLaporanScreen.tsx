@@ -13,15 +13,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
-import { getLaporanHarian } from "../../api/layanan";
-import { Calendar, ChevronRight, FileText, X } from "lucide-react-native";
+import { X } from "lucide-react-native";
 import dayjs from "dayjs";
-import * as XLSX from "xlsx";
 import * as FileSystem from "expo-file-system/legacy";
+import { Download } from "lucide-react-native";
+import {
+  getAllBranches,
+  downloadLaporan, //  nah ini sekarang gmn bre?
+  getLaporanHarian,
+} from "../../api/layanan"; // Pastiin path bener
+import { Buffer } from "buffer";
 import * as Sharing from "expo-sharing";
-import * as MediaLibrary from "expo-media-library";
-import { Download, Filter } from "lucide-react-native";
-import { getAllBranches } from "../../api/layanan"; // Pastiin path bener
 
 const ListLaporanScreen = () => {
   const scheme = useColorScheme() || "dark";
@@ -85,140 +87,54 @@ const ListLaporanScreen = () => {
     }).format(val);
 
   const exportToExcel = async () => {
-    if (!reports || reports.length === 0) {
-      return Alert.alert(
-        "Zonk!",
-        "Kaga ada data laporan buat di-export bulan ini, bre.",
-      );
-    }
-
     try {
-      // 1. Mapping Data Harian
-      const dataRows = reports.map((r) => ({
-        Tanggal: dayjs(r.reportDate).format("DD-MM-YYYY"),
-        Cabang: r.branch?.name || "-",
-        Karyawan: r.createdBy?.fullname || "-",
-        "Total Omzet": r.totalRevenue || 0,
-        "Jatah Owner (50%)": r.ownerShare || 0,
-        "Gaji Karyawan (40%)": r.employeeShare || 0,
-        "Kas Management (10%)": r.managementShare || 0,
-        "Total Jajan": r.totalManagementExpenses || 0,
-        "Net Management": r.managementNet || 0,
-        "WAJIB SETOR CASH": r.totalCashToDeposit || 0,
-        "Rincian Jajan":
-          r.managementExpenses
-            ?.map((ex: any) => `${ex.description} (${ex.amount})`)
-            .join(", ") || "-",
-        Catatan: r.notes || "-",
-      }));
+      setLoading(true);
 
-      // 2. LOGIC TOTALAN PER USER (Buat Rekap Gaji Satuan)
-      const userSalaries: { [key: string]: number } = {};
-      reports.forEach((r) => {
-        const name = r.createdBy?.fullname || "Unknown";
-        userSalaries[name] = (userSalaries[name] || 0) + (r.employeeShare || 0);
+      const start = selectedMonth.startOf("month").format("YYYY-MM-DD");
+      const end = selectedMonth.endOf("month").format("YYYY-MM-DD");
+
+      // 1. HIT BACKEND (Dapetnya ArrayBuffer karena tadi di API lu set gitu)
+      const res = await downloadLaporan({
+        startDate: start,
+        endDate: end,
+        branchId: selectedBranchId || undefined,
       });
 
-      // Mapping rekap gaji per user ke format baris excel
-      const userSalaryRows = Object.keys(userSalaries).map((name) => ({
-        Tanggal: "REKAP GAJI",
-        Cabang: "",
-        Karyawan: name,
-        "Total Omzet": "",
-        "Jatah Owner (50%)": "",
-        "Gaji Karyawan (40%)": userSalaries[name], // Gaji total per orang
-        "Kas Management (10%)": "",
-        "Total Jajan": "",
-        "Net Management": "",
-        "WAJIB SETOR CASH": "",
-        "Rincian Jajan": `Total Gaji ${name}`,
-        Catatan: "",
-      }));
-
-      // 3. LOGIC GRAND TOTAL (Totalan Maut)
-      const totals = reports.reduce(
-        (acc, curr) => ({
-          omzet: acc.omzet + (curr.totalRevenue || 0),
-          owner: acc.owner + (curr.ownerShare || 0),
-          gaji: acc.gaji + (curr.employeeShare || 0),
-          kas: acc.kas + (curr.managementShare || 0),
-          jajan: acc.jajan + (curr.totalManagementExpenses || 0),
-          setor: acc.setor + (curr.totalCashToDeposit || 0),
-        }),
-        { omzet: 0, owner: 0, gaji: 0, kas: 0, jajan: 0, setor: 0 },
-      );
-
-      // 4. Gabungin Semua Baris
-      const finalData = [
-        ...dataRows,
-        {}, // Baris kosong pembatas harian
-        { Tanggal: "--- RINCIAN GAJI PER KARYAWAN ---" },
-        ...userSalaryRows,
-        {}, // Baris kosong pembatas total
-        {
-          Tanggal: "GRAND TOTAL",
-          Cabang: "",
-          Karyawan: "REKAP KESELURUHAN",
-          "Total Omzet": totals.omzet,
-          "Jatah Owner (50%)": totals.owner,
-          "Gaji Karyawan (40%)": totals.gaji,
-          "Kas Management (10%)": totals.kas,
-          "Total Jajan": totals.jajan,
-          "Net Management": "",
-          "WAJIB SETOR CASH": totals.setor,
-          "Rincian Jajan": "--- SELESAI ---",
-          Catatan: `Total Gaji Semua: ${new Intl.NumberFormat("id-ID").format(totals.gaji)}`,
-        },
-      ];
-
-      // 5. Setup SheetJS & Auto-Width
-      const ws = XLSX.utils.json_to_sheet(finalData);
-      const objectMaxLength: any[] = [];
-      finalData.forEach((row: any) => {
-        Object.keys(row).forEach((key, i) => {
-          const value = row[key] ? row[key].toString() : "";
-          const width = Math.max(value.length, key.length);
-          objectMaxLength[i] = { wch: width + 5 };
-        });
-      });
-      ws["!cols"] = objectMaxLength;
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Rekap_Lengkap");
-      const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
+      // 2. KONVERSI ARRAYBUFFER KE BASE64
+      // Karena FileSystem Expo butuh string Base64 buat nulis file
+      const base64 = Buffer.from(res.data, "binary").toString("base64");
 
       const fileName = `Rekap_Full_${selectedMonth.format("MMM_YYYY")}.xlsx`;
 
-      // 6. JURUS SAF (Direct Download)
+      // 3. JURUS SAF (Direct Download ke Folder HP)
       const permissions =
         await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
 
       if (permissions.granted) {
-        const directoryUri = permissions.directoryUri;
         const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
-          directoryUri,
+          permissions.directoryUri,
           fileName,
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         );
 
-        await FileSystem.writeAsStringAsync(fileUri, wbout, {
+        await FileSystem.writeAsStringAsync(fileUri, base64, {
           encoding: FileSystem.EncodingType.Base64,
         });
 
-        Alert.alert(
-          "GGMU Bre!",
-          `Laporan Full Rekap udah mendarat di folder pilihan lu!`,
-        );
+        Alert.alert("GGMU Bre!", "Laporan dari server udah mendarat!");
       } else {
+        // Fallback kalo user pelit ijin folder
         const uri = FileSystem.cacheDirectory + fileName;
-        await FileSystem.writeAsStringAsync(uri, wbout, {
+        await FileSystem.writeAsStringAsync(uri, base64, {
           encoding: FileSystem.EncodingType.Base64,
         });
-        await Sharing.shareAsync(uri);
+        await Sharing.shareAsync(uri); // Sharing dapet darimana bre?
       }
     } catch (err) {
-      console.error("Gagal export:", err);
-      Alert.alert("Waduh!", "Gagal pas mau download bre.");
+      console.error("Gagal export dari server:", err);
+      Alert.alert("Zonk!", "Gagal narik file dari server, bre.");
+    } finally {
+      setLoading(false);
     }
   };
 

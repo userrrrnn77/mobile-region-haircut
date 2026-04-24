@@ -261,7 +261,6 @@ const MonitorAbsensiScreen = () => {
                 </View>
 
                 <View style={styles.modalBody}>
-
                   <View style={styles.detailRow}>
                     <Calendar size={18} color={theme.primary} />
                     <View style={{ marginLeft: 10 }}>
@@ -302,23 +301,122 @@ const MonitorAbsensiScreen = () => {
                     <Clock size={18} color={theme.primary} />
                     <View style={{ marginLeft: 10 }}>
                       <Text
-                        style={{ color: theme.tabIconDefault, fontSize: 12 }}>
+                        style={{
+                          color: theme.tabIconDefault,
+                          fontSize: 12,
+                          marginBottom: 4,
+                        }}>
                         Waktu & Durasi
                       </Text>
-                      <Text style={{ color: theme.text, fontWeight: "bold" }}>
-                        {new Date(selectedAbsen.createdAt).toLocaleTimeString()}{" "}
-                        -
+
+                      {/* BARIS MASUK */}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}>
                         <Text
                           style={{
-                            color:
-                              selectedAbsen.type === "masuk"
-                                ? theme.success
-                                : theme.primary,
+                            color: theme.text,
+                            fontWeight: "bold",
+                            width: 60,
                           }}>
-                          {" "}
-                          {selectedAbsen.type.toUpperCase()}
+                          {selectedAbsen.checkin
+                            ? new Date(
+                                selectedAbsen.checkin,
+                              ).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "--:--"}
                         </Text>
-                      </Text>
+                        <View
+                          style={{
+                            backgroundColor: theme.success + "20",
+                            paddingHorizontal: 8,
+                            borderRadius: 4,
+                            marginLeft: 10,
+                          }}>
+                          <Text
+                            style={{
+                              color: theme.success,
+                              fontSize: 10,
+                              fontWeight: "bold",
+                            }}>
+                            MASUK
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* BARIS KELUAR */}
+                      <View
+                        style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Text
+                          style={{
+                            color: theme.text,
+                            fontWeight: "bold",
+                            width: 60,
+                          }}>
+                          {selectedAbsen.checkout
+                            ? new Date(
+                                selectedAbsen.checkout,
+                              ).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "--:--"}
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: selectedAbsen.checkout
+                              ? theme.primary + "20"
+                              : theme.tabIconDefault + "20",
+                            paddingHorizontal: 8,
+                            borderRadius: 4,
+                            marginLeft: 10,
+                          }}>
+                          <Text
+                            style={{
+                              color: selectedAbsen.checkout
+                                ? theme.primary
+                                : theme.tabIconDefault,
+                              fontSize: 10,
+                              fontWeight: "bold",
+                            }}>
+                            {selectedAbsen.checkout ? "KELUAR" : "BELUM KELUAR"}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* LABEL DURASI (Optional tapi Daging) */}
+                      {selectedAbsen.checkin && selectedAbsen.checkout && (
+                        <View
+                          style={{
+                            marginTop: 8,
+                            paddingTop: 8,
+                            borderTopWidth: 0.5,
+                            borderTopColor: theme.tabIconDefault + "30",
+                          }}>
+                          <Text
+                            style={{
+                              color: theme.tabIconDefault,
+                              fontSize: 11,
+                            }}>
+                            Total Durasi:{" "}
+                            {(() => {
+                              const diff =
+                                new Date(selectedAbsen.checkout).getTime() -
+                                new Date(selectedAbsen.checkin).getTime();
+                              const hours = Math.floor(diff / (1000 * 60 * 60));
+                              const mins = Math.floor(
+                                (diff % (1000 * 60 * 60)) / (1000 * 60),
+                              );
+                              return `${hours} Jam ${mins} Menit`;
+                            })()}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
 

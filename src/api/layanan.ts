@@ -82,3 +82,15 @@ export const getLaporanHarian = (params?: {
   startDate?: string;
   endDate?: string;
 }) => API.get("/laporan", { params });
+
+export const downloadLaporan = (params: {
+  startDate?: string;
+  endDate?: string;
+  branchId?: string;
+  userId?: string;
+}) => {
+  return API.get("/laporan/export", {
+    params,
+    responseType: "arraybuffer", // nah ini pake blob apa arrayBuffer bre? gw pake react native bre
+  });
+};
